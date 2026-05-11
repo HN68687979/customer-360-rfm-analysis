@@ -52,7 +52,7 @@ customer-360-rfm-analysis/
 
 ## 📊 Dashboard
 
-![Dashboard Overview](images/dashboard_overview.png)
+![Dashboard Overview](dashboard_overview.png)
 
 🔗 **[View Interactive Dashboard on Tableau Public](#)** 
 
