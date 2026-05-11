@@ -1,0 +1,114 @@
+-- ============================================================
+-- FILE 02: RFM SCORING
+-- Mục đích: Chấm điểm R, F, M theo tứ phân vị (Quartile 1-4)
+--           dùng ROW_NUMBER() để chia đều khách hàng
+-- Logic:
+--   Recency : điểm 4 = mua gần nhất (recency thấp nhất)
+--   Frequency: điểm 4 = mua nhiều nhất
+--   Monetary : điểm 4 = chi tiêu cao nhất
+-- ============================================================
+
+WITH RFM AS (
+    SELECT
+        CT.customerid,
+        DATEDIFF('2022-09-01', DATE(MAX(CT.purchase_date))) AS recency,
+        ROUND(
+            COUNT(DATE(CT.purchase_date)) / 
+            GREATEST(FLOOR(TIMESTAMPDIFF(MONTH, CR.CREATED_DATE, '2022-09-01') / 12), 1),
+        2) AS frequency,
+        ROUND(
+            SUM(CT.GMV) / 
+            GREATEST(FLOOR(TIMESTAMPDIFF(MONTH, CR.CREATED_DATE, '2022-09-01') / 12), 1),
+        2) AS monetary
+    FROM customer_transaction CT
+    JOIN CUSTOMER_REGISTERED CR ON CT.CUSTOMERID = CR.ID
+    WHERE purchase_date IS NOT NULL AND CT.customerid != 0
+    GROUP BY CT.customerid, CR.CREATED_DATE
+),
+
+-- Tạo row number để xác định vị trí phân vị
+rn AS (
+    SELECT 
+        RFM.*,
+        ROW_NUMBER() OVER (ORDER BY RFM.recency  DESC) AS rn_recency,   -- DESC vì recency thấp = tốt
+        ROW_NUMBER() OVER (ORDER BY RFM.frequency ASC)  AS rn_frequency,
+        ROW_NUMBER() OVER (ORDER BY RFM.monetary  ASC)  AS rn_monetary
+    FROM RFM
+),
+
+customer_statics AS (
+    SELECT 
+        rn.customerid, 
+        rn.recency, 
+        rn.frequency, 
+        rn.monetary,
+
+        -- RECENCY SCORE (R): Recency thấp nhất → điểm 4
+        CASE
+            WHEN rn.recency >= (SELECT MIN(recency) FROM rn)
+                 AND rn.recency < (SELECT recency FROM rn 
+                                   WHERE rn_recency = (SELECT ROUND(MAX(rn_recency)*0.25,0) FROM rn))
+                THEN '4'
+            WHEN rn.recency >= (SELECT recency FROM rn 
+                                WHERE rn_recency = (SELECT ROUND(MAX(rn_recency)*0.25,0) FROM rn))
+                 AND rn.recency < (SELECT recency FROM rn 
+                                   WHERE rn_recency = (SELECT ROUND(MAX(rn_recency)*0.5,0) FROM rn))
+                THEN '3'
+            WHEN rn.recency >= (SELECT recency FROM rn 
+                                WHERE rn_recency = (SELECT ROUND(MAX(rn_recency)*0.5,0) FROM rn))
+                 AND rn.recency < (SELECT recency FROM rn 
+                                   WHERE rn_recency = (SELECT ROUND(MAX(rn_recency)*0.75,0) FROM rn))
+                THEN '2'
+            ELSE '1'
+        END AS R,
+
+        -- FREQUENCY SCORE (F): Frequency cao nhất → điểm 4
+        CASE
+            WHEN rn.frequency >= (SELECT MIN(frequency) FROM rn)
+                 AND rn.frequency < (SELECT frequency FROM rn 
+                                     WHERE rn_frequency = (SELECT ROUND(MAX(rn_frequency)*0.25,0) FROM rn))
+                THEN '1'
+            WHEN rn.frequency >= (SELECT frequency FROM rn 
+                                  WHERE rn_frequency = (SELECT ROUND(MAX(rn_frequency)*0.25,0) FROM rn))
+                 AND rn.frequency < (SELECT frequency FROM rn 
+                                     WHERE rn_frequency = (SELECT ROUND(MAX(rn_frequency)*0.5,0) FROM rn))
+                THEN '2'
+            WHEN rn.frequency >= (SELECT frequency FROM rn 
+                                  WHERE rn_frequency = (SELECT ROUND(MAX(rn_frequency)*0.5,0) FROM rn))
+                 AND rn.frequency < (SELECT frequency FROM rn 
+                                     WHERE rn_frequency = (SELECT ROUND(MAX(rn_frequency)*0.75,0) FROM rn))
+                THEN '3'
+            ELSE '4'
+        END AS F,
+
+        -- MONETARY SCORE (M): Monetary cao nhất → điểm 4
+        CASE
+            WHEN rn.monetary >= (SELECT MIN(monetary) FROM rn)
+                 AND rn.monetary < (SELECT monetary FROM rn 
+                                    WHERE rn_monetary = (SELECT ROUND(MAX(rn_monetary)*0.25,0) FROM rn))
+                THEN '1'
+            WHEN rn.monetary >= (SELECT monetary FROM rn 
+                                 WHERE rn_monetary = (SELECT ROUND(MAX(rn_monetary)*0.25,0) FROM rn))
+                 AND rn.monetary < (SELECT monetary FROM rn 
+                                    WHERE rn_monetary = (SELECT ROUND(MAX(rn_monetary)*0.5,0) FROM rn))
+                THEN '2'
+            WHEN rn.monetary >= (SELECT monetary FROM rn 
+                                 WHERE rn_monetary = (SELECT ROUND(MAX(rn_monetary)*0.5,0) FROM rn))
+                 AND rn.monetary < (SELECT monetary FROM rn 
+                                    WHERE rn_monetary = (SELECT ROUND(MAX(rn_monetary)*0.75,0) FROM rn))
+                THEN '3'
+            ELSE '4'
+        END AS M
+
+    FROM rn
+    GROUP BY rn.customerid, rn.recency, rn.frequency, rn.monetary
+)
+
+SELECT * FROM customer_statics;
+
+-- ============================================================
+-- KẾT QUẢ MẪU:
+-- customerid | recency | frequency | monetary  | R | F | M
+-- 71739      | 62      | 0.14      | 15000.00  | 4 | 1 | 1  → RFM: 411
+-- 72014      | 62      | 0.29      | 36298.71  | 4 | 2 | 2  → RFM: 422
+-- ============================================================
