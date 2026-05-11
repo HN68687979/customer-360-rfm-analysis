@@ -52,7 +52,7 @@ customer-360-rfm-analysis/
 
 ## 📊 Dashboard
 
-![Dashboard Overview](dashboard_overview.png)
+![Dashboard Overview](dashboard_overview.png.png)
 
 🔗 **[View Interactive Dashboard on Tableau Public](#)** 
 
@@ -146,7 +146,7 @@ Sử dụng `ROW_NUMBER()` để chia đều khách hàng vào 4 nhóm (1–4):
 
 ## 📞 Contact
 
-**Nguyễn Minh Hiếu** — Data Analyst
+**Nguyễn Minh Hiếu** 
 
 📱 0972.026.185  
 📧 hieunm0908.work@gmail.com  
