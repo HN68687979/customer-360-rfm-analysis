@@ -54,7 +54,7 @@ customer-360-rfm-analysis/
 
 ![Dashboard Overview](images/dashboard_overview.png)
 
-🔗 **[View Interactive Dashboard on Tableau Public](#)** ← thay bằng link thật của bạn
+🔗 **[View Interactive Dashboard on Tableau Public](#)** 
 
 ---
 
